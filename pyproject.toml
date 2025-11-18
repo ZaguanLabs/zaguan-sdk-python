@@ -35,8 +35,9 @@ test = [
 
 [project.urls]
 Homepage = "https://zaguanai.com"
-Repository = "https://github.com/zaguanai/zaguan-sdk-python"
+Repository = "https://github.com/ZaguanLabs/zaguan-sdk-python"
 Documentation = "https://zaguanai.com/docs"
+API = "https://api.zaguanai.com"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -31,3 +31,18 @@ class RateLimitError(ZaguanError):
     def __init__(self, message: str, retry_after: Optional[int] = None):
         super().__init__(message)
         self.retry_after = retry_after
+
+
+class BandAccessDeniedError(ZaguanError):
+    """Exception for band access denied."""
+    def __init__(
+        self, 
+        message: str, 
+        band: Optional[str] = None,
+        required_tier: Optional[str] = None,
+        current_tier: Optional[str] = None
+    ):
+        super().__init__(message)
+        self.band = band
+        self.required_tier = required_tier
+        self.current_tier = current_tier

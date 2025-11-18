@@ -9,7 +9,7 @@ def basic_chat_example():
     """Basic chat completion example."""
     # Initialize client
     client = ZaguanClient(
-        base_url="https://api.your-zaguan-host.com",
+        base_url="https://api.zaguanai.com",
         api_key="your-api-key"
     )
     

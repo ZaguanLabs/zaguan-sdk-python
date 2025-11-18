@@ -6,7 +6,7 @@ import httpx
 import json
 import uuid
 from typing import Optional, Dict, Any, Iterator
-from .errors import APIError, InsufficientCreditsError, RateLimitError
+from .errors import APIError, InsufficientCreditsError, RateLimitError, BandAccessDeniedError
 
 
 def handle_response(response: httpx.Response, model_class: Any = None):
@@ -42,6 +42,13 @@ def handle_response(response: httpx.Response, model_class: Any = None):
             raise RateLimitError(
                 message,
                 error.get("retry_after")
+            )
+        elif error_type == "band_access_denied":
+            raise BandAccessDeniedError(
+                message,
+                error.get("band"),
+                error.get("required_tier"),
+                error.get("current_tier")
             )
     
     raise APIError(response.status_code, message, request_id)

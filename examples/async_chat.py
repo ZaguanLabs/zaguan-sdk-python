@@ -10,7 +10,7 @@ async def async_chat_example():
     """Async chat completion example."""
     # Initialize client
     client = AsyncZaguanClient(
-        base_url="https://api.your-zaguan-host.com",
+        base_url="https://api.zaguanai.com",
         api_key="your-api-key"
     )
     

@@ -20,7 +20,7 @@ from zaguan_sdk import ZaguanClient, ChatRequest, Message
 
 # Initialize client
 client = ZaguanClient(
-    base_url="https://api.your-zaguan-host.com",
+    base_url="https://api.zaguanai.com",
     api_key="your-api-key"
 )
 
@@ -48,7 +48,7 @@ from zaguan_sdk import AsyncZaguanClient, ChatRequest, Message
 async def main():
     # Initialize client
     client = AsyncZaguanClient(
-        base_url="https://api.your-zaguan-host.com",
+        base_url="https://api.zaguanai.com",
         api_key="your-api-key"
     )
 
@@ -78,6 +78,22 @@ asyncio.run(main())
 - **Error Handling**: Comprehensive error handling with specific exception types
 - **Type Safety**: Full type hints and Pydantic models for all API objects
 - **Credits Management**: Access to credits balance, history, and statistics
+- **Embeddings**: Create embeddings for semantic search and RAG
+- **Audio**: Transcription, translation, and text-to-speech (Whisper, TTS)
+- **Images**: Generation, editing, and variations (DALL-E)
+- **Moderations**: Content safety and policy compliance checking
+
+### Supported Endpoints
+
+✅ Chat Completions (streaming & non-streaming)  
+✅ Models & Capabilities  
+✅ Credits Management  
+✅ Embeddings  
+✅ Audio (Transcription, Translation, Speech)  
+✅ Images (Generation, Editing, Variations)  
+✅ Content Moderation  
+
+**100% coverage of major OpenAI-compatible endpoints**
 
 ## Documentation
 

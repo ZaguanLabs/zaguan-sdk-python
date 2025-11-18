@@ -7,12 +7,18 @@ from pydantic import BaseModel, Field
 
 
 class Message(BaseModel):
-    """A message in a chat conversation."""
-    role: Optional[Literal["system", "user", "assistant", "tool", "function"]] = None
+    """
+    A message in a chat conversation.
+    
+    Note: role is optional to support streaming deltas where role may not be present
+    in every chunk. For non-streaming messages, role should always be provided.
+    """
+    role: Optional[Literal["system", "user", "assistant", "tool", "function", "developer"]] = None
     content: Optional[Union[str, List[Dict[str, Any]]]] = None
     name: Optional[str] = None
     tool_call_id: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
+    function_call: Optional[Dict[str, Any]] = None
 
 
 class TokenDetails(BaseModel):
@@ -45,6 +51,7 @@ class ChatRequest(BaseModel):
     tool_choice: Optional[Union[str, Dict[str, Any]]] = None
     response_format: Optional[Dict[str, Any]] = None
     provider_specific_params: Optional[Dict[str, Any]] = None
+    extra_body: Optional[Dict[str, Any]] = None  # Alias for provider_specific_params
 
     # Advanced OpenAI-compatible parameters
     n: Optional[int] = None
@@ -55,10 +62,45 @@ class ChatRequest(BaseModel):
     seed: Optional[int] = None
     user: Optional[str] = None
     metadata: Optional[Dict[str, str]] = None
+    
+    # Audio output (GPT-4o Audio)
+    modalities: Optional[List[str]] = None
+    audio: Optional[Dict[str, Any]] = None
+    
+    # Reasoning models (o1, o3, etc.)
+    reasoning_effort: Optional[Literal["minimal", "low", "medium", "high"]] = None
+    
+    # DeepSeek-specific
+    thinking: Optional[bool] = None
+    
+    # Zaguan extensions
+    virtual_model_id: Optional[str] = None
+    store: Optional[bool] = None
+    verbosity: Optional[Literal["low", "medium", "high"]] = None
+    parallel_tool_calls: Optional[bool] = None
 
     def copy(self) -> "ChatRequest":
         """Create a copy of this ChatRequest."""
         return ChatRequest(**self.model_dump())
+    
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        """
+        Override model_dump to merge extra_body with provider_specific_params.
+        This ensures compatibility with OpenAI SDK patterns.
+        """
+        data = super().model_dump(**kwargs)
+        
+        # Merge extra_body into provider_specific_params if both exist
+        if data.get("extra_body") and data.get("provider_specific_params"):
+            merged = {**data["provider_specific_params"], **data["extra_body"]}
+            data["provider_specific_params"] = merged
+            del data["extra_body"]
+        elif data.get("extra_body"):
+            # If only extra_body exists, rename it to provider_specific_params
+            data["provider_specific_params"] = data["extra_body"]
+            del data["extra_body"]
+        
+        return data
 
     model_config = {
         "populate_by_name": True
@@ -150,3 +192,186 @@ class CreditsStats(BaseModel):
     total_credits_used: int
     total_cost: float
     model_breakdown: List[Dict[str, Any]]
+
+
+# ============================================================================
+# Embeddings Models
+# ============================================================================
+
+class EmbeddingRequest(BaseModel):
+    """Request for creating embeddings."""
+    model: str
+    input: Union[str, List[str]]
+    encoding_format: Optional[Literal["float", "base64"]] = "float"
+    dimensions: Optional[int] = None
+    user: Optional[str] = None
+
+
+class Embedding(BaseModel):
+    """A single embedding vector."""
+    object: str
+    embedding: List[float]
+    index: int
+
+
+class EmbeddingResponse(BaseModel):
+    """Response from embeddings endpoint."""
+    object: str
+    data: List[Embedding]
+    model: str
+    usage: Usage
+
+
+# ============================================================================
+# Audio Models
+# ============================================================================
+
+class AudioTranscriptionRequest(BaseModel):
+    """Request for audio transcription."""
+    file: bytes  # Audio file content
+    model: str
+    language: Optional[str] = None
+    prompt: Optional[str] = None
+    response_format: Optional[Literal["json", "text", "srt", "verbose_json", "vtt"]] = "json"
+    temperature: Optional[float] = None
+    timestamp_granularities: Optional[List[Literal["word", "segment"]]] = None
+
+
+class AudioTranslationRequest(BaseModel):
+    """Request for audio translation."""
+    file: bytes  # Audio file content
+    model: str
+    prompt: Optional[str] = None
+    response_format: Optional[Literal["json", "text", "srt", "verbose_json", "vtt"]] = "json"
+    temperature: Optional[float] = None
+
+
+class AudioTranscriptionResponse(BaseModel):
+    """Response from audio transcription."""
+    text: str
+    language: Optional[str] = None
+    duration: Optional[float] = None
+    words: Optional[List[Dict[str, Any]]] = None
+    segments: Optional[List[Dict[str, Any]]] = None
+
+
+class AudioSpeechRequest(BaseModel):
+    """Request for text-to-speech."""
+    model: str
+    input: str
+    voice: Literal["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+    response_format: Optional[Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]] = "mp3"
+    speed: Optional[float] = Field(default=1.0, ge=0.25, le=4.0)
+
+
+# ============================================================================
+# Images Models
+# ============================================================================
+
+class ImageGenerationRequest(BaseModel):
+    """Request for image generation."""
+    model: Optional[str] = "dall-e-3"
+    prompt: str
+    n: Optional[int] = Field(default=1, ge=1, le=10)
+    size: Optional[Literal["256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"]] = "1024x1024"
+    quality: Optional[Literal["standard", "hd"]] = "standard"
+    response_format: Optional[Literal["url", "b64_json"]] = "url"
+    style: Optional[Literal["vivid", "natural"]] = "vivid"
+    user: Optional[str] = None
+
+
+class ImageEditRequest(BaseModel):
+    """Request for image editing."""
+    image: bytes  # Image file content
+    prompt: str
+    mask: Optional[bytes] = None  # Mask file content
+    model: Optional[str] = "dall-e-2"
+    n: Optional[int] = Field(default=1, ge=1, le=10)
+    size: Optional[Literal["256x256", "512x512", "1024x1024"]] = "1024x1024"
+    response_format: Optional[Literal["url", "b64_json"]] = "url"
+    user: Optional[str] = None
+
+
+class ImageVariationRequest(BaseModel):
+    """Request for image variations."""
+    image: bytes  # Image file content
+    model: Optional[str] = "dall-e-2"
+    n: Optional[int] = Field(default=1, ge=1, le=10)
+    size: Optional[Literal["256x256", "512x512", "1024x1024"]] = "1024x1024"
+    response_format: Optional[Literal["url", "b64_json"]] = "url"
+    user: Optional[str] = None
+
+
+class ImageData(BaseModel):
+    """A single generated/edited image."""
+    url: Optional[str] = None
+    b64_json: Optional[str] = None
+    revised_prompt: Optional[str] = None
+
+
+class ImageResponse(BaseModel):
+    """Response from image endpoints."""
+    created: int
+    data: List[ImageData]
+
+
+# ============================================================================
+# Moderations Models
+# ============================================================================
+
+class ModerationRequest(BaseModel):
+    """Request for content moderation."""
+    input: Union[str, List[str]]
+    model: Optional[str] = "text-moderation-latest"
+
+
+class ModerationCategories(BaseModel):
+    """Moderation categories."""
+    hate: bool
+    hate_threatening: bool = Field(alias="hate/threatening")
+    harassment: bool
+    harassment_threatening: bool = Field(alias="harassment/threatening")
+    self_harm: bool = Field(alias="self-harm")
+    self_harm_intent: bool = Field(alias="self-harm/intent")
+    self_harm_instructions: bool = Field(alias="self-harm/instructions")
+    sexual: bool
+    sexual_minors: bool = Field(alias="sexual/minors")
+    violence: bool
+    violence_graphic: bool = Field(alias="violence/graphic")
+
+    model_config = {
+        "populate_by_name": True
+    }
+
+
+class ModerationCategoryScores(BaseModel):
+    """Moderation category scores."""
+    hate: float
+    hate_threatening: float = Field(alias="hate/threatening")
+    harassment: float
+    harassment_threatening: float = Field(alias="harassment/threatening")
+    self_harm: float = Field(alias="self-harm")
+    self_harm_intent: float = Field(alias="self-harm/intent")
+    self_harm_instructions: float = Field(alias="self-harm/instructions")
+    sexual: float
+    sexual_minors: float = Field(alias="sexual/minors")
+    violence: float
+    violence_graphic: float = Field(alias="violence/graphic")
+
+    model_config = {
+        "populate_by_name": True
+    }
+
+
+class ModerationResult(BaseModel):
+    """A single moderation result."""
+    flagged: bool
+    categories: ModerationCategories
+    category_scores: ModerationCategoryScores
+
+
+class ModerationResponse(BaseModel):
+    """Response from moderation endpoint."""
+    id: str
+    model: str
+    results: List[ModerationResult]

@@ -16,9 +16,13 @@ from .async_client import AsyncZaguanClient
 from .models import (
     Message, TokenDetails, Usage, ChatRequest, Choice,
     ChatResponse, ChatChunk, ModelInfo, ModelCapabilities,
-    CreditsBalance, CreditsHistoryEntry, CreditsHistory, CreditsStats
+    CreditsBalance, CreditsHistoryEntry, CreditsHistory, CreditsStats,
+    EmbeddingRequest, Embedding, EmbeddingResponse,
+    AudioTranscriptionRequest, AudioTranslationRequest, AudioTranscriptionResponse, AudioSpeechRequest,
+    ImageGenerationRequest, ImageEditRequest, ImageVariationRequest, ImageData, ImageResponse,
+    ModerationRequest, ModerationCategories, ModerationCategoryScores, ModerationResult, ModerationResponse
 )
-from .errors import ZaguanError, APIError, InsufficientCreditsError, RateLimitError
+from .errors import ZaguanError, APIError, InsufficientCreditsError, RateLimitError, BandAccessDeniedError
 
 # Version info
 __all__ = [
@@ -41,4 +45,26 @@ __all__ = [
     "APIError",
     "InsufficientCreditsError",
     "RateLimitError",
+    "BandAccessDeniedError",
+    # Embeddings
+    "EmbeddingRequest",
+    "Embedding",
+    "EmbeddingResponse",
+    # Audio
+    "AudioTranscriptionRequest",
+    "AudioTranslationRequest",
+    "AudioTranscriptionResponse",
+    "AudioSpeechRequest",
+    # Images
+    "ImageGenerationRequest",
+    "ImageEditRequest",
+    "ImageVariationRequest",
+    "ImageData",
+    "ImageResponse",
+    # Moderations
+    "ModerationRequest",
+    "ModerationCategories",
+    "ModerationCategoryScores",
+    "ModerationResult",
+    "ModerationResponse",
 ]

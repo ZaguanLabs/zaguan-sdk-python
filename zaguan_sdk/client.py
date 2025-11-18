@@ -10,7 +10,11 @@ from .models import (
     ChatRequest, ChatResponse, ChatChunk,
     ModelInfo, ModelCapabilities,
     CreditsBalance, CreditsHistory, CreditsStats,
-    Message
+    Message,
+    EmbeddingRequest, EmbeddingResponse,
+    AudioTranscriptionRequest, AudioTranslationRequest, AudioTranscriptionResponse, AudioSpeechRequest,
+    ImageGenerationRequest, ImageEditRequest, ImageVariationRequest, ImageResponse,
+    ModerationRequest, ModerationResponse
 )
 from ._http import handle_response, prepare_headers
 from .errors import ZaguanError
@@ -66,10 +70,15 @@ class ZaguanClient:
         Raises:
             ValueError: If base_url or api_key are empty/None
         """
+        if not base_url or not base_url.strip():
+            raise ValueError("base_url cannot be empty")
+        if not api_key or not api_key.strip():
+            raise ValueError("api_key cannot be empty")
+        
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
-        self.timeout = timeout
-        self._client = http_client or httpx.Client(timeout=timeout)
+        self.timeout = timeout if timeout is not None else 30.0
+        self._client = http_client or httpx.Client(timeout=self.timeout)
     
     def _prepare_headers(self, request_id: Optional[str] = None) -> Dict[str, str]:
         """Prepare headers for an API request."""
@@ -152,20 +161,30 @@ class ZaguanClient:
         # Convert request to dict, handling aliases and excluding None values
         request_dict = stream_request.model_dump(by_alias=True, exclude_none=True)
         
-        with self._client.stream("POST", url, headers=headers, json=request_dict) as response:
-            response.raise_for_status()
-            for line in response.iter_lines():
-                if not line or line.startswith("data: [DONE]"):
-                    continue
-                # Parse SSE-style line
-                if line.startswith("data:"):
-                    payload = line[len("data:"):].strip()
-                    try:
-                        data = json.loads(payload)
-                        yield ChatChunk(**data)
-                    except json.JSONDecodeError:
-                        # Skip malformed lines
+        try:
+            with self._client.stream("POST", url, headers=headers, json=request_dict) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if not line or line == "data: [DONE]":
                         continue
+                    # Parse SSE-style line
+                    if line.startswith("data:"):
+                        payload = line[len("data:"):].strip()
+                        if not payload:
+                            continue
+                        try:
+                            data = json.loads(payload)
+                            yield ChatChunk(**data)
+                        except json.JSONDecodeError as e:
+                            # Skip malformed lines but could log warning
+                            continue
+                        except Exception as e:
+                            # Handle Pydantic validation errors
+                            raise ZaguanError(f"Failed to parse chunk: {e}")
+        except httpx.HTTPStatusError as e:
+            # Re-raise as our custom error type
+            handle_response(e.response)
     
     def list_models(self, request_id: Optional[str] = None) -> List[ModelInfo]:
         """
@@ -335,3 +354,357 @@ class ZaguanClient:
             ]
         )
         return self.chat(request)
+
+    # ========================================================================
+    # Embeddings
+    # ========================================================================
+
+    def create_embeddings(
+        self,
+        request: EmbeddingRequest,
+        request_id: Optional[str] = None
+    ) -> EmbeddingResponse:
+        """
+        Create embeddings for the given input.
+
+        Args:
+            request: The embedding request
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Embedding response with vectors
+
+        Example:
+            ```python
+            request = EmbeddingRequest(
+                model="openai/text-embedding-3-small",
+                input="Hello, world!"
+            )
+            response = client.create_embeddings(request)
+            print(response.data[0].embedding)
+            ```
+        """
+        url = f"{self.base_url}/v1/embeddings"
+        headers = self._prepare_headers(request_id)
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, EmbeddingResponse)
+
+    # ========================================================================
+    # Audio
+    # ========================================================================
+
+    def create_transcription(
+        self,
+        file_path: str,
+        model: str = "whisper-1",
+        language: Optional[str] = None,
+        prompt: Optional[str] = None,
+        response_format: str = "json",
+        temperature: Optional[float] = None,
+        request_id: Optional[str] = None
+    ) -> AudioTranscriptionResponse:
+        """
+        Transcribe audio to text.
+
+        Args:
+            file_path: Path to the audio file
+            model: Model to use (default: whisper-1)
+            language: Language of the audio (ISO-639-1 format)
+            prompt: Optional text to guide the model's style
+            response_format: Format of the response (json, text, srt, verbose_json, vtt)
+            temperature: Sampling temperature
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Transcription response
+
+        Example:
+            ```python
+            response = client.create_transcription(
+                file_path="audio.mp3",
+                model="whisper-1",
+                language="en"
+            )
+            print(response.text)
+            ```
+        """
+        url = f"{self.base_url}/v1/audio/transcriptions"
+        headers = self._prepare_headers(request_id)
+        # Remove Content-Type for multipart
+        del headers["Content-Type"]
+
+        with open(file_path, "rb") as f:
+            files = {"file": f}
+            data = {
+                "model": model,
+                "response_format": response_format
+            }
+            if language:
+                data["language"] = language
+            if prompt:
+                data["prompt"] = prompt
+            if temperature is not None:
+                data["temperature"] = temperature
+
+            response = self._client.post(url, headers=headers, files=files, data=data)
+
+        if response_format == "json" or response_format == "verbose_json":
+            return handle_response(response, AudioTranscriptionResponse)
+        else:
+            # Return text directly for other formats
+            return AudioTranscriptionResponse(text=response.text)
+
+    def create_translation(
+        self,
+        file_path: str,
+        model: str = "whisper-1",
+        prompt: Optional[str] = None,
+        response_format: str = "json",
+        temperature: Optional[float] = None,
+        request_id: Optional[str] = None
+    ) -> AudioTranscriptionResponse:
+        """
+        Translate audio to English text.
+
+        Args:
+            file_path: Path to the audio file
+            model: Model to use (default: whisper-1)
+            prompt: Optional text to guide the model's style
+            response_format: Format of the response
+            temperature: Sampling temperature
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Translation response
+        """
+        url = f"{self.base_url}/v1/audio/translations"
+        headers = self._prepare_headers(request_id)
+        del headers["Content-Type"]
+
+        with open(file_path, "rb") as f:
+            files = {"file": f}
+            data = {
+                "model": model,
+                "response_format": response_format
+            }
+            if prompt:
+                data["prompt"] = prompt
+            if temperature is not None:
+                data["temperature"] = temperature
+
+            response = self._client.post(url, headers=headers, files=files, data=data)
+
+        if response_format == "json" or response_format == "verbose_json":
+            return handle_response(response, AudioTranscriptionResponse)
+        else:
+            return AudioTranscriptionResponse(text=response.text)
+
+    def create_speech(
+        self,
+        request: AudioSpeechRequest,
+        output_path: str,
+        request_id: Optional[str] = None
+    ) -> None:
+        """
+        Generate speech from text.
+
+        Args:
+            request: The speech request
+            output_path: Path to save the audio file
+            request_id: Optional request ID for tracking
+
+        Example:
+            ```python
+            request = AudioSpeechRequest(
+                model="tts-1",
+                input="Hello, world!",
+                voice="alloy"
+            )
+            client.create_speech(request, "output.mp3")
+            ```
+        """
+        url = f"{self.base_url}/v1/audio/speech"
+        headers = self._prepare_headers(request_id)
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        response.raise_for_status()
+
+        with open(output_path, "wb") as f:
+            f.write(response.content)
+
+    # ========================================================================
+    # Images
+    # ========================================================================
+
+    def create_image(
+        self,
+        request: ImageGenerationRequest,
+        request_id: Optional[str] = None
+    ) -> ImageResponse:
+        """
+        Generate images from a text prompt.
+
+        Args:
+            request: The image generation request
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Image response with URLs or base64 data
+
+        Example:
+            ```python
+            request = ImageGenerationRequest(
+                prompt="A cute cat",
+                model="dall-e-3",
+                size="1024x1024",
+                quality="hd"
+            )
+            response = client.create_image(request)
+            print(response.data[0].url)
+            ```
+        """
+        url = f"{self.base_url}/v1/images/generations"
+        headers = self._prepare_headers(request_id)
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, ImageResponse)
+
+    def edit_image(
+        self,
+        image_path: str,
+        prompt: str,
+        mask_path: Optional[str] = None,
+        model: str = "dall-e-2",
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+        request_id: Optional[str] = None
+    ) -> ImageResponse:
+        """
+        Edit an image based on a prompt.
+
+        Args:
+            image_path: Path to the image file (PNG, <4MB, square)
+            prompt: Description of the desired edit
+            mask_path: Optional path to mask image (transparent areas will be edited)
+            model: Model to use
+            n: Number of images to generate
+            size: Size of the generated images
+            response_format: Format of the response (url or b64_json)
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Image response
+        """
+        url = f"{self.base_url}/v1/images/edits"
+        headers = self._prepare_headers(request_id)
+        del headers["Content-Type"]
+
+        files = {}
+        with open(image_path, "rb") as f:
+            files["image"] = f.read()
+
+        if mask_path:
+            with open(mask_path, "rb") as f:
+                files["mask"] = f.read()
+
+        data = {
+            "prompt": prompt,
+            "model": model,
+            "n": n,
+            "size": size,
+            "response_format": response_format
+        }
+
+        response = self._client.post(
+            url,
+            headers=headers,
+            files={k: (k, v) for k, v in files.items()},
+            data=data
+        )
+        return handle_response(response, ImageResponse)
+
+    def create_image_variation(
+        self,
+        image_path: str,
+        model: str = "dall-e-2",
+        n: int = 1,
+        size: str = "1024x1024",
+        response_format: str = "url",
+        request_id: Optional[str] = None
+    ) -> ImageResponse:
+        """
+        Create variations of an image.
+
+        Args:
+            image_path: Path to the image file (PNG, <4MB, square)
+            model: Model to use
+            n: Number of variations to generate
+            size: Size of the generated images
+            response_format: Format of the response (url or b64_json)
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Image response
+        """
+        url = f"{self.base_url}/v1/images/variations"
+        headers = self._prepare_headers(request_id)
+        del headers["Content-Type"]
+
+        with open(image_path, "rb") as f:
+            files = {"image": f}
+            data = {
+                "model": model,
+                "n": n,
+                "size": size,
+                "response_format": response_format
+            }
+
+            response = self._client.post(url, headers=headers, files=files, data=data)
+
+        return handle_response(response, ImageResponse)
+
+    # ========================================================================
+    # Moderations
+    # ========================================================================
+
+    def create_moderation(
+        self,
+        request: ModerationRequest,
+        request_id: Optional[str] = None
+    ) -> ModerationResponse:
+        """
+        Check if content violates OpenAI's usage policies.
+
+        Args:
+            request: The moderation request
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Moderation response with flagged categories
+
+        Example:
+            ```python
+            request = ModerationRequest(
+                input="I want to hurt someone"
+            )
+            response = client.create_moderation(request)
+            if response.results[0].flagged:
+                print("Content flagged!")
+                print(response.results[0].categories)
+            ```
+        """
+        url = f"{self.base_url}/v1/moderations"
+        headers = self._prepare_headers(request_id)
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, ModerationResponse)
