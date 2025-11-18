@@ -9,7 +9,7 @@ a single, OpenAI-compatible API.
 
 __version__ = "0.1.0"
 __author__ = "Zaguan AI"
-__email__ = "support@zaguan.ai"
+__email__ = "support@zaguanai.com"
 
 from .client import ZaguanClient
 from .async_client import AsyncZaguanClient

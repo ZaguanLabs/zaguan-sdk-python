@@ -28,7 +28,7 @@ class ZaguanClient:
         from zaguan import ZaguanClient, ChatRequest, Message
 
         client = ZaguanClient(
-            base_url="https://api.zaguan.ai",
+            base_url="https://api.zaguanai.com",
             api_key="your-api-key"
         )
 

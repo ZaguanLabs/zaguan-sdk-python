@@ -139,3 +139,7 @@ While Zaguan CoreX exposes an OpenAI-compatible API (allowing existing OpenAI SD
 - Handling of CoreX's credits and accounting endpoints
 - A stable, documented contract for multi-provider usage
 - Preferred integration path over raw OpenAI SDK usage
+
+## Qwen Added Memories
+- Zaguan contact email: support@zaguanai.com and website: https://zaguanai.com/
+- Zaguan documentation URL: https://zaguanai.com/docs
