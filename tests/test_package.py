@@ -4,14 +4,14 @@ Test to verify the package structure and imports.
 
 def test_package_structure():
     # Test imports
-    from zaguan import (
+    from zaguan_sdk import (
         ZaguanClient, AsyncZaguanClient,
         Message, TokenDetails, Usage, ChatRequest, Choice,
         ChatResponse, ChatChunk, ModelInfo, ModelCapabilities,
         CreditsBalance, CreditsHistoryEntry, CreditsHistory, CreditsStats
     )
     
-    from zaguan import (
+    from zaguan_sdk import (
         ZaguanError, APIError, InsufficientCreditsError, RateLimitError
     )
     

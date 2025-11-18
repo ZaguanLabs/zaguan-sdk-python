@@ -1,8 +1,8 @@
 import pytest
 import respx
 import httpx
-from zaguan import ZaguanClient, AsyncZaguanClient
-from zaguan.errors import ZaguanError, APIError, InsufficientCreditsError, RateLimitError
+from zaguan_sdk import ZaguanClient, AsyncZaguanClient
+from zaguan_sdk.errors import ZaguanError, APIError, InsufficientCreditsError, RateLimitError
 
 
 class TestErrorHandling:
@@ -25,7 +25,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -55,7 +55,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -85,7 +85,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -106,7 +106,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -126,7 +126,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="invalid-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -154,7 +154,7 @@ class TestErrorHandling:
         
         client = AsyncZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -184,7 +184,7 @@ class TestErrorHandling:
         
         client = AsyncZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -223,7 +223,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]
@@ -243,7 +243,7 @@ class TestErrorHandling:
         
         client = ZaguanClient(base_url="https://api.example.com", api_key="test-key")
         
-        from zaguan import ChatRequest, Message
+        from zaguan_sdk import ChatRequest, Message
         request = ChatRequest(
             model="openai/gpt-4o",
             messages=[Message(role="user", content="Hello")]

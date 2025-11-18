@@ -1,7 +1,7 @@
 import pytest
 import respx
 import httpx
-from zaguan import ZaguanClient, AsyncZaguanClient
+from zaguan_sdk import ZaguanClient, AsyncZaguanClient
 
 
 class TestCreditsManagement:

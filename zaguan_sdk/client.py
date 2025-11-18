@@ -25,7 +25,7 @@ class ZaguanClient:
 
     Example:
         ```python
-        from zaguan import ZaguanClient, ChatRequest, Message
+        from zaguan_sdk import ZaguanClient, ChatRequest, Message
 
         client = ZaguanClient(
             base_url="https://api.zaguanai.com",
@@ -101,7 +101,7 @@ class ZaguanClient:
 
         Example:
             ```python
-            from zaguan import ChatRequest, Message
+            from zaguan_sdk import ChatRequest, Message
 
             request = ChatRequest(
                 model="openai/gpt-4o",

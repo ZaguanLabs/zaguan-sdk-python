@@ -1,7 +1,7 @@
 import pytest
 import respx
 import httpx
-from zaguan import ZaguanClient, AsyncZaguanClient, ChatRequest, Message
+from zaguan_sdk import ZaguanClient, AsyncZaguanClient, ChatRequest, Message
 
 
 class TestAdvancedFeatures:

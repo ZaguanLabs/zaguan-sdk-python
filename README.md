@@ -8,7 +8,7 @@ The official Python SDK for Zaguán CoreX - an enterprise-grade AI gateway that 
 ## Installation
 
 ```bash
-pip install zaguan
+pip install zaguan-sdk
 ```
 
 ## Quick Start
@@ -16,7 +16,7 @@ pip install zaguan
 ### Synchronous Usage
 
 ```python
-from zaguan import ZaguanClient, ChatRequest, Message
+from zaguan_sdk import ZaguanClient, ChatRequest, Message
 
 # Initialize client
 client = ZaguanClient(
@@ -43,7 +43,7 @@ print(response.choices[0].message.content)
 
 ```python
 import asyncio
-from zaguan import AsyncZaguanClient, ChatRequest, Message
+from zaguan_sdk import AsyncZaguanClient, ChatRequest, Message
 
 async def main():
     # Initialize client

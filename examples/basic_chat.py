@@ -2,7 +2,7 @@
 Example usage of the Zaguan SDK.
 """
 
-from zaguan import ZaguanClient, ChatRequest, Message
+from zaguan_sdk import ZaguanClient, ChatRequest, Message
 
 
 def basic_chat_example():

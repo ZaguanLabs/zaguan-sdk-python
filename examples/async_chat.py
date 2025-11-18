@@ -3,7 +3,7 @@ Async example usage of the Zaguan SDK.
 """
 
 import asyncio
-from zaguan import AsyncZaguanClient, ChatRequest, Message
+from zaguan_sdk import AsyncZaguanClient, ChatRequest, Message
 
 
 async def async_chat_example():
