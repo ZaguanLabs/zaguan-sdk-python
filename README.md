@@ -228,6 +228,101 @@ if result.results[0].flagged:
 
 **📁 More examples in [`examples/`](examples/) directory**
 
+## ✨ Advanced Features
+
+### Anthropic Messages API (Native)
+
+Access Anthropic's extended thinking and native API features:
+
+```python
+from zaguan_sdk import (
+    AnthropicMessagesRequest,
+    AnthropicMessage,
+    AnthropicThinkingConfig
+)
+
+# Use extended thinking for complex reasoning
+request = AnthropicMessagesRequest(
+    model="anthropic/claude-3-5-sonnet",
+    messages=[
+        AnthropicMessage(role="user", content="Explain quantum computing")
+    ],
+    max_tokens=2048,
+    thinking=AnthropicThinkingConfig(
+        type="enabled",
+        budget_tokens=5000  # Internal reasoning budget
+    )
+)
+
+response = client.messages(request)
+
+# Process thinking and response blocks
+for block in response.content:
+    if block.type == "thinking":
+        print(f"🧠 Thinking: {block.thinking}")
+    elif block.type == "text":
+        print(f"💬 Response: {block.text}")
+```
+
+### Streaming Utilities
+
+Accumulate streaming responses easily:
+
+```python
+from zaguan_sdk import StreamAccumulator
+
+accumulator = StreamAccumulator()
+
+for chunk in client.chat_stream(request):
+    accumulator.add_chunk(chunk)
+    # Print as we go
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)
+
+# Get the complete message
+message = accumulator.get_message()
+```
+
+### Retry Logic
+
+Built-in retry with exponential backoff:
+
+```python
+from zaguan_sdk import RetryConfig, with_retry
+
+retry_config = RetryConfig(
+    max_retries=5,
+    initial_delay=1.0,
+    exponential_base=2.0,
+    jitter=True
+)
+
+@with_retry(retry_config)
+def make_request():
+    return client.chat(request)
+
+response = make_request()  # Automatically retries on failures
+```
+
+### Observability
+
+Track metrics and logs:
+
+```python
+from zaguan_sdk import MetricsCollector, LoggingHook
+
+# Collect metrics
+metrics = MetricsCollector()
+
+# After requests...
+summary = metrics.get_summary()
+print(f"Success rate: {summary['success_rate']:.2%}")
+print(f"Average latency: {summary['average_latency_ms']:.2f}ms")
+print(f"Total cost: ${summary['total_cost']:.6f}")
+```
+
+**📚 Learn more:** [Advanced Features Guide](docs/ADVANCED_FEATURES.md)
+
 ## 🌐 Supported Providers
 
 Access 15+ AI providers through one unified API:
@@ -253,6 +348,11 @@ Access 15+ AI providers through one unified API:
 - **[Quick Start Guide](docs/SDK/SDK_PYTHON_IMPLEMENTATION_NOTES.md)** - Get up and running in 5 minutes
 - **[Complete Examples](examples/)** - Real-world usage examples
 - **[API Reference](docs/SDK/SDK_CORE_TYPES.md)** - Full type documentation
+
+### 🎯 Advanced Features
+- **[Provider-Specific Examples](docs/PROVIDER_EXAMPLES.md)** - Use unique features from each provider
+- **[Advanced Features Guide](docs/ADVANCED_FEATURES.md)** - Streaming, retry logic, observability, and more
+- **[Anthropic Messages API](docs/ADVANCED_FEATURES.md#anthropic-messages-api)** - Native Anthropic API with extended thinking
 
 ### 🏗️ Architecture
 - **[SDK Design Overview](docs/SDK/SDK_DESIGN_OVERVIEW.md)** - Architecture and design principles

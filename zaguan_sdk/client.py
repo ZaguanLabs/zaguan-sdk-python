@@ -14,7 +14,10 @@ from .models import (
     EmbeddingRequest, EmbeddingResponse,
     AudioTranscriptionRequest, AudioTranslationRequest, AudioTranscriptionResponse, AudioSpeechRequest,
     ImageGenerationRequest, ImageEditRequest, ImageVariationRequest, ImageResponse,
-    ModerationRequest, ModerationResponse
+    ModerationRequest, ModerationResponse,
+    AnthropicMessagesRequest, AnthropicMessagesResponse, AnthropicMessagesStreamEvent,
+    AnthropicCountTokensRequest, AnthropicCountTokensResponse,
+    AnthropicMessagesBatchRequest, AnthropicMessagesBatchResponse, AnthropicMessagesBatchItem
 )
 from ._http import handle_response, prepare_headers
 from .errors import ZaguanError
@@ -708,3 +711,305 @@ class ZaguanClient:
 
         response = self._client.post(url, headers=headers, json=request_dict)
         return handle_response(response, ModerationResponse)
+
+    # ========================================================================
+    # Anthropic Messages API (Native)
+    # ========================================================================
+
+    def messages(
+        self,
+        request: AnthropicMessagesRequest,
+        request_id: Optional[str] = None
+    ) -> AnthropicMessagesResponse:
+        """
+        Send a request to Anthropic's native Messages API.
+
+        This is the recommended way to access Anthropic-specific features like
+        extended thinking. Use this instead of the OpenAI-compatible chat API
+        when you need Anthropic's native response format.
+
+        Args:
+            request: The Anthropic messages request
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Anthropic messages response with content blocks
+
+        Example:
+            ```python
+            from zaguan_sdk import AnthropicMessagesRequest, AnthropicMessage, AnthropicThinkingConfig
+
+            request = AnthropicMessagesRequest(
+                model="anthropic/claude-3-5-sonnet",
+                messages=[
+                    AnthropicMessage(role="user", content="Explain quantum computing")
+                ],
+                max_tokens=1024,
+                thinking=AnthropicThinkingConfig(type="enabled", budget_tokens=5000)
+            )
+            response = client.messages(request)
+            for block in response.content:
+                if block.type == "thinking":
+                    print(f"Thinking: {block.thinking}")
+                elif block.type == "text":
+                    print(f"Response: {block.text}")
+            ```
+        """
+        url = f"{self.base_url}/v1/messages"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, AnthropicMessagesResponse)
+
+    def messages_stream(
+        self,
+        request: AnthropicMessagesRequest,
+        request_id: Optional[str] = None
+    ) -> Iterator[AnthropicMessagesStreamEvent]:
+        """
+        Stream responses from Anthropic's Messages API.
+
+        Args:
+            request: The Anthropic messages request
+            request_id: Optional request ID for tracking
+
+        Yields:
+            Streaming events from Anthropic
+
+        Example:
+            ```python
+            request = AnthropicMessagesRequest(
+                model="anthropic/claude-3-5-sonnet",
+                messages=[AnthropicMessage(role="user", content="Tell me a story")],
+                max_tokens=1024,
+                stream=True
+            )
+            for event in client.messages_stream(request):
+                if event.type == "content_block_delta":
+                    if event.delta.text:
+                        print(event.delta.text, end="", flush=True)
+            ```
+        """
+        url = f"{self.base_url}/v1/messages"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        # Ensure streaming is enabled
+        stream_request = request.model_copy()
+        stream_request.stream = True
+
+        request_dict = stream_request.model_dump(by_alias=True, exclude_none=True)
+
+        try:
+            with self._client.stream("POST", url, headers=headers, json=request_dict) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Parse SSE-style events
+                    if line.startswith("event:"):
+                        event_type = line[len("event:"):].strip()
+                        continue
+                    if line.startswith("data:"):
+                        payload = line[len("data:"):].strip()
+                        if not payload:
+                            continue
+                        try:
+                            data = json.loads(payload)
+                            yield AnthropicMessagesStreamEvent(**data)
+                        except json.JSONDecodeError:
+                            continue
+                        except Exception as e:
+                            raise ZaguanError(f"Failed to parse Anthropic stream event: {e}")
+        except httpx.HTTPStatusError as e:
+            handle_response(e.response)
+
+    def count_tokens(
+        self,
+        request: AnthropicCountTokensRequest,
+        request_id: Optional[str] = None
+    ) -> AnthropicCountTokensResponse:
+        """
+        Count tokens for an Anthropic Messages request.
+
+        This endpoint allows you to count tokens before sending a request,
+        useful for cost estimation and staying within token limits.
+
+        Args:
+            request: The token counting request
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Token count response
+
+        Example:
+            ```python
+            from zaguan_sdk import AnthropicCountTokensRequest, AnthropicMessage
+
+            request = AnthropicCountTokensRequest(
+                model="anthropic/claude-3-5-sonnet",
+                messages=[
+                    AnthropicMessage(role="user", content="Hello, world!")
+                ]
+            )
+            response = client.count_tokens(request)
+            print(f"Input tokens: {response.input_tokens}")
+            ```
+        """
+        url = f"{self.base_url}/v1/messages/count_tokens"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        request_dict = request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, AnthropicCountTokensResponse)
+
+    def create_messages_batch(
+        self,
+        requests: List[AnthropicMessagesBatchItem],
+        request_id: Optional[str] = None
+    ) -> AnthropicMessagesBatchResponse:
+        """
+        Create a batch of message requests for asynchronous processing.
+
+        Args:
+            requests: List of batch items with custom IDs and parameters
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Batch response with status and ID
+
+        Example:
+            ```python
+            from zaguan_sdk import AnthropicMessagesBatchItem, AnthropicMessagesRequest, AnthropicMessage
+
+            items = [
+                AnthropicMessagesBatchItem(
+                    custom_id="request-1",
+                    params=AnthropicMessagesRequest(
+                        model="anthropic/claude-3-5-sonnet",
+                        messages=[AnthropicMessage(role="user", content="Hello")],
+                        max_tokens=100
+                    )
+                )
+            ]
+            batch = client.create_messages_batch(items)
+            print(f"Batch ID: {batch.id}")
+            ```
+        """
+        url = f"{self.base_url}/v1/messages/batches"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        batch_request = AnthropicMessagesBatchRequest(requests=requests)
+        request_dict = batch_request.model_dump(by_alias=True, exclude_none=True)
+
+        response = self._client.post(url, headers=headers, json=request_dict)
+        return handle_response(response, AnthropicMessagesBatchResponse)
+
+    def get_messages_batch(
+        self,
+        batch_id: str,
+        request_id: Optional[str] = None
+    ) -> AnthropicMessagesBatchResponse:
+        """
+        Get the status of a message batch.
+
+        Args:
+            batch_id: The batch ID to query
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Batch status response
+        """
+        url = f"{self.base_url}/v1/messages/batches/{batch_id}"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        response = self._client.get(url, headers=headers)
+        return handle_response(response, AnthropicMessagesBatchResponse)
+
+    def list_messages_batches(
+        self,
+        request_id: Optional[str] = None
+    ) -> List[AnthropicMessagesBatchResponse]:
+        """
+        List all message batches.
+
+        Args:
+            request_id: Optional request ID for tracking
+
+        Returns:
+            List of batch responses
+        """
+        url = f"{self.base_url}/v1/messages/batches"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        response = self._client.get(url, headers=headers)
+        data = handle_response(response)
+        return [AnthropicMessagesBatchResponse(**batch) for batch in data.get("data", [])]
+
+    def cancel_messages_batch(
+        self,
+        batch_id: str,
+        request_id: Optional[str] = None
+    ) -> AnthropicMessagesBatchResponse:
+        """
+        Cancel a message batch.
+
+        Args:
+            batch_id: The batch ID to cancel
+            request_id: Optional request ID for tracking
+
+        Returns:
+            Updated batch status
+        """
+        url = f"{self.base_url}/v1/messages/batches/{batch_id}/cancel"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        response = self._client.post(url, headers=headers)
+        return handle_response(response, AnthropicMessagesBatchResponse)
+
+    def get_messages_batch_results(
+        self,
+        batch_id: str,
+        request_id: Optional[str] = None
+    ) -> Iterator[str]:
+        """
+        Get batch results as JSONL stream.
+
+        Args:
+            batch_id: The batch ID to get results for
+            request_id: Optional request ID for tracking
+
+        Yields:
+            JSONL lines with results
+
+        Example:
+            ```python
+            for line in client.get_messages_batch_results("batch_123"):
+                result = json.loads(line)
+                print(f"Custom ID: {result['custom_id']}")
+                print(f"Result: {result['result']}")
+            ```
+        """
+        url = f"{self.base_url}/v1/messages/batches/{batch_id}/results"
+        headers = self._prepare_headers(request_id)
+        headers["anthropic-version"] = "2023-06-01"
+
+        try:
+            with self._client.stream("GET", url, headers=headers) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    line = line.strip()
+                    if line:
+                        yield line
+        except httpx.HTTPStatusError as e:
+            handle_response(e.response)
